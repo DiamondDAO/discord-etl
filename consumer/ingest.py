@@ -70,7 +70,7 @@ if __name__ == "__main__":
         return cleaned_data
 
     # process users
-    processData('users', 'discord/users/_', clean_users)
+    processData('user', 'discord/users/_', clean_users)
     processData('user_histories', 'discord/users/', clean_user_histories)
     # process guilds
     guilds = processData('guilds', 'discord/guilds/guildEntities', clean_guilds)
