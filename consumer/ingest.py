@@ -49,20 +49,25 @@ if __name__ == "__main__":
             all_content.append(raw_content)
         return all_content
 
-    def processData(tableName, path, cleaner, altData = None, bucket = s3_bucket, engine = pysycopg2Connection, cursor = cur):
+    def processData(tableName, path, cleaner, altData = None, write_to_s3 = False, write_to_db = True, bucket = s3_bucket, engine = pysycopg2Connection, cursor = cur):
         data = getRawContent(path)
         cleaned_data = cleaner(data)
         if altData:
             cleaned_data = altData
+            
         # Write to s3
-        file_prefix = f"discord/cleaned_data/"
-        file_name = file_prefix + f"{tableName}.json"
-        s3object = s3.Object(bucket, file_name)
-        s3object.put(Body=(bytes(json.dumps(cleaned_data).encode("UTF-8"))))
-        print(f"{tableName}.json loaded to s3")
-        return cleaned_data
+        if write_to_s3:
+            file_prefix = f"discord/cleaned_data/"
+            file_name = file_prefix + f"{tableName}.json"
+            s3object = s3.Object(bucket, file_name)
+            s3object.put(Body=(bytes(json.dumps(cleaned_data).encode("UTF-8"))))
+            print(f"{tableName}.json loaded to s3")
+        
         # Write to DB
-        truncate_and_ingest(cleaned_data, cur, engine, f"discord.{tableName}")
+        if write_to_db:
+            truncate_and_ingest(cleaned_data, cur, engine, f"discord.{tableName}")
+        
+        return cleaned_data
 
     # process users
     processData('users', 'discord/users/_', clean_users)
