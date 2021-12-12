@@ -1,4 +1,5 @@
 # discord-etl
+
 This program takes the output from `discord-bot` then transforms and loads into a database
 
 ## environment setup
@@ -10,3 +11,9 @@ Create a virtual environment named `discord-etl`: `python3 -m venv discord-etl`
 Activate your virtual environment: `source discord-etl/bin/activate`
 
 Install packages from `requirements.txt`: `python3 -m pip install -r requirements.txt`
+
+## running the script
+
+`python3 consumer/ingest.py`
+
+arguments: --ingest True/False (write to db) --write_to_s3 True/False (save cleaned json to s3)

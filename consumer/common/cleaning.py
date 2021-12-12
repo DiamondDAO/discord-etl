@@ -1,16 +1,15 @@
+from datetime import datetime
+import time
 
 
-# For each table in the datamodel:
-# Define a function which accepts the raw data dict (comes from JSON in S3)
-# 1. Define the tags (columns of the eventual table)
-# 2. Create an empty "clean" object and an empty "final" object
-# 3. Copy the raw object key:value pairs to the "clean" object
-# 4. Apply any auxilary cleaning to the "clean" object
-# 5. For each tag defined in (1), add the corrisponding key:value from "clean" to "final"
-    # if that key:value dne, assign to None
-# 6. For each key in the "final", run fix_sql_field()
-# 7. If this data belongs to a collection, append to a final array
-# 8. Return the data.
+def clean_date(raw_date):
+    if not raw_date:
+        return ""
+    raw_date = raw_date // 1000
+    final_date = datetime.fromtimestamp(raw_date)
+    final_date = final_date.strftime("%Y-%m-%d, %H:%M:%S")
+    return final_date
+
 
 def clean_guilds(raw_guilds):
     guild_entry_keys = [
@@ -22,10 +21,8 @@ def clean_guilds(raw_guilds):
         clean_guild = {}
         final_guild = {}
 
-
         for key, value in raw_guild.items():
             clean_guild[key] = value
-
 
         for key in guild_entry_keys:
             try:
@@ -35,6 +32,7 @@ def clean_guilds(raw_guilds):
             final_guild[key] = fix_sql_field(final_guild[key])
         final_guilds.append(final_guild)
     return final_guilds
+
 
 def clean_guild_histories(raw_guild_histories):
     guild_history_keys = [
@@ -62,6 +60,7 @@ def clean_guild_histories(raw_guild_histories):
             except:
                 final_history[key] = None
             final_history[key] = fix_sql_field(final_history[key])
+        final_history["recordTimestamp"] = clean_date(final_history["recordTimestamp"])
         final_guild_histories.append(final_history)
 
     return final_guild_histories
@@ -83,16 +82,17 @@ def clean_guild_messages(raw_guild_messages):
         for key, value in raw_message.items():
             clean_message[key] = value
 
-
         for key in guild_message_keys:
             try:
                 final_message[key] = clean_message[key]
             except:
                 final_message[key] = None
             final_message[key] = fix_sql_field(final_message[key])
+        final_message["createdTimestamp"] = clean_date(final_message["createdTimestamp"])
         final_guild_messages.append(final_message)
 
     return final_guild_messages
+
 
 def clean_guild_message_histories(raw_guild_message_histories):
     guild_message_history_keys = [
@@ -100,9 +100,9 @@ def clean_guild_message_histories(raw_guild_message_histories):
         "deleted",
         "content",
         "pinned",
-        "mentions_everyone", # raw.mentions.everyone
-        "mentions_users", # raw.mentions.users
-        "mentions_roles", # raw.mentions.roles
+        "mentions_everyone",  # raw.mentions.everyone
+        "mentions_users",  # raw.mentions.users
+        "mentions_roles",  # raw.mentions.roles
         "editedTimestamp",
         "timestamp",
     ]
@@ -113,23 +113,41 @@ def clean_guild_message_histories(raw_guild_message_histories):
         final_history = {}
         for key, value in raw_history.items():
             clean_history[key] = value
-        if 'mentions' in raw_history.keys():
-            clean_history['mentions_everyone'] = raw_history['mentions']['everyone']
-            clean_history['mentions_users'] = raw_history['mentions']['users']
-            clean_history['mentions_roles'] = raw_history['mentions']['roles']
+        clean_history["mentions_everyone"] = "{}"
+        clean_history["mentions_users"] = "{}"
+        clean_history["mentions_roles"] = "{}"
+        if "mentions" in raw_history.keys():
+            if raw_history["mentions"]["everyone"]:
+                x = ", ".join(raw_history["mentions"]["everyone"])
+                x = "{" + x + "}"
+                clean_history["mentions_everyone"] = x
+            if raw_history["mentions"]["users"]:
+                x = ", ".join(raw_history["mentions"]["users"])
+                x = "{" + x + "}"
+                clean_history["mentions_users"] = x
+            if raw_history["mentions"]["roles"]:
+                x = ", ".join(raw_history["mentions"]["roles"])
+                x = "{" + x + "}"
+                clean_history["mentions_roles"] = x
 
+        clean_history["timestamp"] = clean_history["recordTimestamp"]
         for key in guild_message_history_keys:
             try:
                 final_history[key] = clean_history[key]
             except:
                 final_history[key] = None
             final_history[key] = fix_sql_field(final_history[key])
+        if final_history["editedTimestamp"]:
+            final_history["editedTimestamp"] = clean_date(final_history["editedTimestamp"])
+        if final_history["timestamp"]:
+            final_history["timestamp"] = clean_date(final_history["timestamp"])
         final_guild_message_histories.append(final_history)
     return final_guild_message_histories
 
+
 def clean_guild_members(raw_guild_members):
     guild_member_keys = [
-        "user",
+        "member",
         "guild",
         "joinedTimestamp",
     ]
@@ -142,19 +160,23 @@ def clean_guild_members(raw_guild_members):
         for key, value in raw_member.items():
             clean_member[key] = value
 
+        clean_member["member"] = clean_member["user"]
+
         for key in guild_member_keys:
             try:
                 final_member[key] = clean_member[key]
             except:
                 final_member[key] = None
             final_member[key] = fix_sql_field(final_member[key])
+        final_member["joinedTimestamp"] = clean_date(final_member["joinedTimestamp"])
         final_guild_members.append(final_member)
 
     return final_guild_members
 
+
 def clean_guild_member_histories(raw_member_histories):
     member_history_keys = [
-        "id",
+        "member",
         "premiumSinceTimestamp",
         "deleted",
         "nickname",
@@ -167,52 +189,57 @@ def clean_guild_member_histories(raw_member_histories):
         clean_history = {}
         final_history = {}
 
-        if 'roles' in raw_history.keys():
-            for role in raw_history['roles']:
+        if "roles" in raw_history.keys():
+            for role in raw_history["roles"]:
                 clean_role = {}
-                clean_role[raw_history['user']] = role['id']
+                clean_role["role"] = role["id"]
+                clean_role["user"] = raw_history["user"]
+
                 final_guild_member_roles.append(clean_role)
 
         for key, value in raw_history.items():
             clean_history[key] = value
 
+        clean_history["member"] = clean_history["user"]
         for key in member_history_keys:
             try:
                 final_history[key] = clean_history[key]
             except:
                 final_history[key] = None
             final_history[key] = fix_sql_field(final_history[key])
+        final_history["premiumSinceTimestamp"] = clean_date(final_history["premiumSinceTimestamp"])
+        final_history["recordTimestamp"] = clean_date(final_history["recordTimestamp"])
         final_member_histories.append(final_history)
 
     return final_member_histories, final_guild_member_roles
-
-
 
 
 def clean_guild_message_reactions(raw_guild_message_reactions):
     guild_message_reaction_keys = [
         "message",
         "reactionEmoji",
-        "user",
-        "recordTimestamp", # note that for initial reactions this will be the time when the bot joined and fetched them
-        "deleted",
+        "member",
+        "recordTimestamp",  # note that for initial reactions this will be the time when the bot joined and fetched them
     ]
 
     final_reactions = []
     for raw_reaction in raw_guild_message_reactions:
-        clean_reaction = {}
-        final_reaction = {}
+        for user in raw_reaction["users"]:
+            clean_reaction = {}
+            final_reaction = {}
 
-        for key, value in raw_reaction.items():
-            clean_reaction[key] = value
+            for key, value in raw_reaction.items():
+                clean_reaction[key] = value
+            clean_reaction["member"] = user
 
-        for key in guild_message_reaction_keys:
-            try:
-                final_reaction[key] = clean_reaction[key]
-            except:
-                final_reaction[key] = None
-            final_reaction[key] = fix_sql_field(final_reaction[key])
-        final_reactions.append(final_reaction)
+            for key in guild_message_reaction_keys:
+                try:
+                    final_reaction[key] = clean_reaction[key]
+                except:
+                    final_reaction[key] = None
+                final_reaction[key] = fix_sql_field(final_reaction[key])
+            final_reaction["recordTimestamp"] = clean_date(final_reaction["recordTimestamp"])
+            final_reactions.append(final_reaction)
 
     return final_reactions
 
@@ -233,10 +260,10 @@ def clean_users(raw_users):
 
         for key in user_keys:
             try:
-                final_user[key] = clean_user[key]
+                final_user[key] = fix_sql_field(clean_user[key])
             except:
                 final_user[key] = None
-            final_user[key] = fix_sql_field(final_user[key])
+
         final_users.append(final_user)
 
     return final_users
@@ -266,6 +293,7 @@ def clean_user_histories(raw_user_histories):
             except:
                 final_history[key] = None
             final_history[key] = fix_sql_field(final_history[key])
+        final_history["recordTimestamp"] = clean_date(final_history["recordTimestamp"])
         final_user_histories.append(final_history)
 
     return final_user_histories
@@ -274,17 +302,16 @@ def clean_user_histories(raw_user_histories):
 def clean_roles(raw_roles):
     role_keys = [
         "id",
-        "guild",
     ]
 
     final_roles = []
     for raw_role in raw_roles:
         clean_role = {}
         final_role = {}
-
         for key, value in raw_role.items():
             clean_role[key] = value
 
+        clean_role["id"] = clean_role["role"]
         for key in role_keys:
             try:
                 final_role[key] = clean_role[key]
@@ -323,6 +350,7 @@ def clean_role_histories(raw_role_histories):
             except:
                 final_history[key] = None
             final_history[key] = fix_sql_field(final_history[key])
+        final_history["recordTimestamp"] = clean_date(final_history["recordTimestamp"])
         final_role_histories.append(final_history)
 
     return final_role_histories
@@ -377,14 +405,16 @@ def clean_guild_channel_histories(raw_channel_histories):
             except:
                 final_history[key] = None
             final_history[key] = fix_sql_field(final_history[key])
+        final_history["recordTimestamp"] = clean_date(final_history["recordTimestamp"])
         final_channel_histories.append(final_history)
 
     return final_channel_histories
 
 
-
 def fix_sql_field(x):
     if type(x) == bool:
+        return x
+    if type(x) == list:
         return x
     try:
         x = int(x)
