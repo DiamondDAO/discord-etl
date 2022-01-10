@@ -1,6 +1,7 @@
 import boto3
 import json
 from datetime import datetime, timedelta
+import time
 import sys
 import io
 import psycopg2
@@ -8,8 +9,8 @@ import os
 import pandas as pd
 from dotenv import load_dotenv
 sys.path.append(__file__)
-from helpers.s3 import get_matching_s3_keys, get_matching_s3_objects
-from helpers.cleaning import *
+from common.s3 import get_matching_s3_keys, get_matching_s3_objects
+from common.cleaning import *
 
 def truncate_and_ingest(cleaned_json, cur, engine, table_name):
     df = pd.DataFrame(cleaned_json)
@@ -26,8 +27,11 @@ if __name__ == "__main__":
 
     load_dotenv()
 
+    last_timestamp = os.getenv('TIMESTAMP')
+
     s3_bucket = os.getenv('S3_BUCKET')
     s3 = boto3.resource("s3")
+
 
     database_dict = {
         "database": os.environ.get("POSTGRES_DB"),
@@ -40,9 +44,9 @@ if __name__ == "__main__":
     pysycopg2Connection = psycopg2.connect(**database_dict)
     cur = pysycopg2Connection.cursor()
 
-    def getRawContent(path, bucket = s3_bucket, fileType = '.json'):
+    def getRawContent(path, bucket = s3_bucket, fileEnding = '.json'):
         all_content = []
-        for key in get_matching_s3_keys(s3_bucket, path, fileType):
+        for key in get_matching_s3_keys(s3_bucket, path, fileEnding, last_timestamp):
             content_object = s3.Object(s3_bucket, key)
             file_content = content_object.get()["Body"].read().decode("utf-8")
             raw_content = json.loads(file_content)
@@ -97,5 +101,9 @@ if __name__ == "__main__":
         processData('guild_channel_histories', path + 'channels/', clean_guild_channel_histories)
         print(f'Data for guild {guild_id} processed')
 
+    
+    current_timestamp = int(time.time())
+    with open(".env", "w") as f:
+        f.write(f"TIMESTAMP={current_timestamp}")
     cur.close()
     print("Done")

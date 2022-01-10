@@ -1,7 +1,7 @@
 import boto3
 
 
-def get_matching_s3_objects(bucket, prefix="", suffix=""):
+def get_matching_s3_objects(bucket, prefix="", suffix="", fromTimestamp = 0):
     """
     Generate objects in an S3 bucket.
 
@@ -34,7 +34,8 @@ def get_matching_s3_objects(bucket, prefix="", suffix=""):
 
             for obj in contents:
                 key = obj["Key"]
-                if key.endswith(suffix):
+                timestamp = int(key.split("_")[2])
+                if (key.endswith(suffix) and timestamp > fromTimestamp) :
                     yield obj
 
 
