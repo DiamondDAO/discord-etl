@@ -95,7 +95,8 @@ if __name__ == "__main__":
         processData('guild_roles', path + 'roles/_', clean_roles)
         processData('guild_role_histories', path + 'roles/', clean_role_histories)
         # process reactions
-        processData('guild_message_reactions', path + 'reactions', clean_guild_message_reactions)
+        processData('guild_message_reactions', path + 'reactions/_', clean_guild_message_reactions)
+        processData('guild_message_reaction_histories', path + 'reactions/', clean_guild_message_reactions_histories)
         # process channels
         processData('guild_channels', path + 'channels/_', clean_guild_channels)
         processData('guild_channel_histories', path + 'channels/', clean_guild_channel_histories)

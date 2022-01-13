@@ -194,6 +194,7 @@ def clean_guild_message_reactions(raw_guild_message_reactions):
         "message",
         "reactionEmoji",
         "user",
+        "fetchedOnBotJoin", # True if this reaction existed before the bot joined the server, else false
         "recordTimestamp", # note that for initial reactions this will be the time when the bot joined and fetched them
         "deleted",
     ]
@@ -215,6 +216,31 @@ def clean_guild_message_reactions(raw_guild_message_reactions):
         final_reactions.append(final_reaction)
 
     return final_reactions
+
+def clean_guild_message_reactions_histories(raw_guild_message_reactions_histories):
+    guild_message_reaction_history_keys = [
+        "id",
+        "deleted",
+        "recordTimestamp",
+    ]
+
+    final_reactions_histories = []
+    for raw_history in raw_guild_message_reactions_histories:
+        clean_history = {}
+        final_history = {}
+
+        for key, value in raw_history.items():
+            clean_history[key] = value
+
+        for key in guild_message_reaction_history_keys:
+            try:
+                final_history[key] = clean_history[key]
+            except:
+                final_history[key] = None
+            final_history[key] = fix_sql_field(final_history[key])
+        final_reactions_histories.append(final_history)
+
+    return final_reactions_histories
 
 
 def clean_users(raw_users):
